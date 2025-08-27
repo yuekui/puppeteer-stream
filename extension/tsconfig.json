@@ -1,5 +1,5 @@
 {
-	"include": ["./options.ts"],
+	"include": ["./options.ts", "./background.ts"],
 	"compilerOptions": {
 		"target": "ES2017",
 		"module": "ESNext",

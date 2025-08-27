@@ -7,5 +7,17 @@
 		"tcp": { "connect": ["*"] }
 	},
 	"permissions": ["tabs", "tabCapture", "storage", "scripting", "sockets.udp", "sockets.tcp"],
-	"host_permissions": ["*://*/*", "<all_urls>", "https://*/*", "http://*/*"]
+	"host_permissions": ["*://*/*", "<all_urls>", "https://*/*", "http://*/*"],
+	"action": { "default_title": "Video Capture" },
+	"background": { "service_worker": "background.js" },
+	"options_page": "options.html",
+	"commands": {
+		"invoke-action": {
+			"suggested_key": {
+				"default": "Ctrl+Shift+Y",
+				"mac": "Command+Shift+Y"
+			},
+			"description": "Invoke extension for current tab"
+		}
+	}
 }
