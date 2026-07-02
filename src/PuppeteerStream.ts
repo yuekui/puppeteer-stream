@@ -258,7 +258,11 @@ function unlock() {
 	else mutex = false;
 }
 
-export async function getStream(page: Page, opts: getStreamOptions) {
+export interface PuppeteerStream extends Transform {
+	stop: () => Promise<void>;
+}
+
+export async function getStream(page: Page, opts: getStreamOptions): Promise<PuppeteerStream> {
 	if (!opts.audio && !opts.video) throw new Error("At least audio or video must be true");
 	if (!opts.mimeType) {
 		if (opts.video) opts.mimeType = "video/webm";
@@ -293,7 +297,14 @@ export async function getStream(page: Page, opts: getStreamOptions) {
 		transform(chunk, encoding, callback) {
 			callback(null, chunk);
 		},
-	});
+	}) as PuppeteerStream;
+
+	stream.stop = async () => {
+		if (!extension.isClosed() && extension.browser().isConnected()) {
+			// @ts-ignore
+			await extension.evaluate((index) => STOP_RECORDING(index), index).catch(() => {});
+		}
+	};
 
 	function onConnection(ws: WebSocket, req: IncomingMessage) {
 		const url = new URL(`http://localhost:${port}${req.url}`);
