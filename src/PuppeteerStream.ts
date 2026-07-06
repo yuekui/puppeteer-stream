@@ -259,7 +259,11 @@ function unlock() {
 	else mutex = false;
 }
 
-export async function getStream(page: Page, opts: getStreamOptions) {
+export interface PuppeteerStream extends Transform {
+	stop: () => Promise<void>;
+}
+
+export async function getStream(page: Page, opts: getStreamOptions): Promise<PuppeteerStream> {
 	if (!opts.audio && !opts.video) throw new Error("At least audio or video must be true");
 	if (!opts.mimeType) {
 		if (opts.video) opts.mimeType = "video/webm";
@@ -294,30 +298,37 @@ export async function getStream(page: Page, opts: getStreamOptions) {
 		transform(chunk, encoding, callback) {
 			callback(null, chunk);
 		},
-	});
+	}) as PuppeteerStream;
+
+	stream.stop = async () => {
+		if (!extension.isClosed() && extension.browser().isConnected()) {
+			// @ts-ignore
+			await extension.evaluate((index) => STOP_RECORDING(index), index).catch(() => {});
+		}
+	};
 
 	function onConnection(ws: WebSocket, req: IncomingMessage) {
 		const url = new URL(`http://localhost:${port}${req.url}`);
 		if (url.searchParams.get("index") != index.toString()) return;
 
 		async function close() {
-			if (!stream.readableEnded && !stream.writableEnded) stream.end();
 			if (!extension.isClosed() && extension.browser().isConnected()) {
 				// @ts-ignore
-				extension.evaluate((index) => STOP_RECORDING(index), index);
+				extension.evaluate((index) => STOP_RECORDING(index), index).catch(() => {});
 			}
 
-			if (ws.readyState != WebSocket.CLOSED) {
-				setTimeout(() => {
-					// await pending messages to be sent and then close the socket
-					if (ws.readyState != WebSocket.CLOSED) ws.close();
-				}, opts.streamConfig?.closeTimeout ?? 5000);
+			if (ws.readyState === WebSocket.CLOSED) {
+				if (!stream.destroyed && !stream.readableEnded && !stream.writableEnded) {
+					stream.end();
+				}
 			}
 			(await wss).off("connection", onConnection);
 		}
 
 		ws.on("message", (data) => {
-			stream.write(data);
+			if (!stream.destroyed && !stream.writableEnded) {
+				stream.write(data);
+			}
 		});
 
 		ws.on("close", close);
